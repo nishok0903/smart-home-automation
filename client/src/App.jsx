@@ -9,10 +9,13 @@ function App() {
 
   useEffect(() => {
     // MQTT Broker configuration using environment variables
-    const client = mqtt.connect(import.meta.env.VITE_MQTT_BROKER_URL, {
-      username: import.meta.env.VITE_MQTT_USERNAME,
-      password: import.meta.env.VITE_MQTT_PASSWORD,
-    });
+    const client = mqtt.connect(
+      "mqtts://0c6a92febc6b4714919a796026caa7c7.s1.eu.hivemq.cloud:8884",
+      {
+        username: "HomeAutomationController",
+        password: "StrongPassword1$$",
+      }
+    );
 
     client.on("connect", () => {
       console.log("Connected to MQTT broker");
