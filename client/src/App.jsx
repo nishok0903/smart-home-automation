@@ -6,33 +6,37 @@ function App() {
   const [lightColor, setLightColor] = useState("None");
   const [motorSpeed, setMotorSpeed] = useState(0); // 0: off, 1: speed 1, 2: speed 2, 3: speed 3
   const [status, setStatus] = useState("");
+  const [client, setClient] = useState(null); // Store the client here
 
   useEffect(() => {
     // MQTT Broker configuration using environment variables
-    const client = mqtt.connect(
-      "mqtts://0c6a92febc6b4714919a796026caa7c7.s1.eu.hivemq.cloud:8884",
+    const mqttClient = mqtt.connect(
+      "wss://0c6a92febc6b4714919a796026caa7c7.s1.eu.hivemq.cloud:8884/mqtt",
       {
         username: "HomeAutomationController",
         password: "StrongPassword1$$",
       }
     );
 
-    client.on("connect", () => {
+    mqttClient.on("connect", () => {
       console.log("Connected to MQTT broker");
-      client.subscribe("/light");
-      client.subscribe("/motor");
-      client.subscribe("/getstatus");
+      mqttClient.subscribe("/light");
+      mqttClient.subscribe("/motor");
+      mqttClient.subscribe("/getstatus");
     });
 
-    client.on("message", (topic, message) => {
+    mqttClient.on("message", (topic, message) => {
       if (topic === "/getstatus") {
         setStatus(message.toString());
       }
     });
 
+    // Store the client so it can be used elsewhere
+    setClient(mqttClient);
+
     // Cleanup when the component unmounts
     return () => {
-      client.end();
+      mqttClient.end();
     };
   }, []);
 
@@ -40,31 +44,30 @@ function App() {
     const newState = !lightState;
     setLightState(newState);
     const message = newState ? "1" : "0"; // Turn on/off light
-    publishToMqtt("/light", message);
+    if (client) {
+      client.publish("/light", message);
+    }
   };
 
   const changeLightColor = (color) => {
     setLightColor(color);
-    publishToMqtt("/light", color); // Publish color change
+    if (client) {
+      client.publish("/light", color); // Publish color change
+    }
   };
 
   const changeMotorSpeed = (speed) => {
     setMotorSpeed(speed);
     const message = speed.toString(); // Set motor speed
-    publishToMqtt("/motor", message); // Motor will automatically be ON when speed is set to 1, 2, or 3
-  };
-
-  const publishToMqtt = (topic, message) => {
-    const client = mqtt.connect(import.meta.env.VITE_MQTT_BROKER_URL, {
-      username: import.meta.env.VITE_MQTT_USERNAME,
-      password: import.meta.env.VITE_MQTT_PASSWORD,
-    });
-    client.publish(topic, message);
-    client.end();
+    if (client) {
+      client.publish("/motor", message); // Motor will automatically be ON when speed is set to 1, 2, or 3
+    }
   };
 
   const getStatus = () => {
-    publishToMqtt("/getstatus", "");
+    if (client) {
+      client.publish("/getstatus", "");
+    }
   };
 
   return (
