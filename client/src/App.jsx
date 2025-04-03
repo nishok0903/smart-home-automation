@@ -2,14 +2,15 @@ import React, { useState, useEffect } from "react";
 import mqtt from "mqtt";
 
 function App() {
-  const [lightState, setLightState] = useState(false);
-  const [lightColor, setLightColor] = useState("None");
-  const [motorSpeed, setMotorSpeed] = useState(0); // 0: off, 1: speed 1, 2: speed 2, 3: speed 3
-  const [status, setStatus] = useState("");
-  const [client, setClient] = useState(null); // Store the client here
+  // States to manage the light and motor settings, and MQTT client connection
+  const [lightState, setLightState] = useState(false); // Light on/off
+  const [lightColor, setLightColor] = useState("None"); // Light color (Red, Green, Blue)
+  const [motorSpeed, setMotorSpeed] = useState(0); // Motor speed (0: off, 1: low, 2: medium, 3: high)
+  const [brightness, setBrightness] = useState(255); // Light brightness (1 to 255)
+  const [client, setClient] = useState(null); // MQTT client to communicate with broker
 
   useEffect(() => {
-    // MQTT Broker configuration using environment variables
+    // Establish the connection with the MQTT broker
     const mqttClient = mqtt.connect(
       "wss://0c6a92febc6b4714919a796026caa7c7.s1.eu.hivemq.cloud:8884/mqtt",
       {
@@ -18,72 +19,69 @@ function App() {
       }
     );
 
+    // Once connected to the MQTT broker
     mqttClient.on("connect", () => {
       console.log("Connected to MQTT broker");
+
+      // Subscribe to the topics to receive light and motor control updates (if required)
       mqttClient.subscribe("/light");
       mqttClient.subscribe("/motor");
-      mqttClient.subscribe("/getstatus");
     });
 
-    mqttClient.on("message", (topic, message) => {
-      if (topic === "/getstatus") {
-        const statusMessage = message.toString();
-        const statusParts = statusMessage.split(",");
-        const lightStatus = statusParts[0].split(":")[1]; // light:1 or light:0
-        const motorStatus = statusParts[1].split(":")[1]; // motor:1, motor:2, motor:3, or motor:0
-
-        const formattedStatus = `
-          Light is ${lightStatus === "1" ? "ON" : "OFF"} 
-          | Motor Speed is ${motorStatus === "0" ? "OFF" : motorStatus}
-        `;
-        setStatus(formattedStatus);
-      }
-    });
-
-    // Store the client so it can be used elsewhere
+    // Store the MQTT client to communicate later in the app
     setClient(mqttClient);
 
-    // Cleanup when the component unmounts
+    // Cleanup function to disconnect the MQTT client when the component unmounts
     return () => {
       mqttClient.end();
     };
-  }, []);
+  }, []); // This effect runs once on component mount
 
+  // Function to toggle light state (on/off)
   const toggleLight = () => {
-    const newState = !lightState;
-    setLightState(newState);
-    const message = newState ? "1" : "0"; // Turn on/off light
+    const newLightState = !lightState; // Toggle the light state
+    setLightState(newLightState);
+
+    // Publish the new light state to the MQTT broker
+    const message = newLightState ? "1" : "0"; // "1" for ON, "0" for OFF
     if (client) {
-      client.publish("/light", message);
+      client.publish("/light", message); // Send the light state to the broker
     }
   };
 
+  // Function to change the light color
   const changeLightColor = (color) => {
     setLightColor(color);
+
+    // Publish the selected color to the MQTT broker
     if (client) {
-      client.publish("/light", color); // Publish color change
+      client.publish("/light", color); // Send the selected color to the broker
     }
   };
 
+  // Function to change the motor speed
   const changeMotorSpeed = (speed) => {
     setMotorSpeed(speed);
-    const message = speed.toString(); // Set motor speed
+
+    // Publish the motor speed to the MQTT broker
     if (client) {
-      client.publish("/motor", message); // Motor will automatically be ON when speed is set to 1, 2, or 3
+      client.publish("/motor", speed.toString()); // Send the motor speed to the broker
     }
   };
 
-  const getStatus = () => {
-    if (client) {
-      client.publish("/getstatus", "");
+  // Function to handle the brightness slider change
+  const handleBrightnessChange = (event) => {
+    const newBrightness = event.target.value; // Get the new brightness value from the slider
+    setBrightness(newBrightness);
+
+    // Publish the new brightness value if the light is ON
+    if (client && lightState) {
+      client.publish("/intensity", newBrightness.toString()); // Send the brightness value to the broker
     }
   };
 
   return (
-    <div
-      className='min-h-screen flex flex-col justify-center items-center bg-gray-200 p-6'
-      style={{ fontFamily: "Inter, sans-serif" }}
-    >
+    <div className='min-h-screen flex flex-col justify-center items-center bg-gray-200 p-6'>
       <div className='max-w-xl w-full bg-white shadow-xl rounded-xl p-8'>
         <h1
           className='text-3xl font-bold text-center p-4'
@@ -97,42 +95,58 @@ function App() {
           <h2 className='text-2xl font-semibold text-gray-700 mb-3'>
             Control Light
           </h2>
-          <button
-            onClick={toggleLight}
-            className={`w-full py-3 text-white font-semibold rounded-lg transition-all duration-300 ${
-              lightState
-                ? "bg-gradient-to-r from-red-600 to-red-400"
-                : "bg-gradient-to-r from-green-600 to-green-400"
-            }`}
-          >
-            {lightState ? "Turn Off Light" : "Turn On Light"}
-          </button>
-        </div>
 
-        <div className='mb-6'>
-          <h2 className='text-2xl font-semibold text-gray-700 mb-3'>
-            Change Light Color
-          </h2>
+          {/* Buttons to toggle light color */}
           <div className='grid grid-cols-3 gap-4'>
             <button
               onClick={() => changeLightColor("1")}
-              className='w-full py-3 text-white font-semibold rounded-lg bg-gradient-to-r from-red-600 to-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition duration-300'
+              className={`w-full py-3 text-white font-semibold rounded-lg transition-all duration-300 ${
+                lightColor === "1"
+                  ? "scale-110 bg-gradient-to-r from-red-600 to-red-400"
+                  : "bg-gradient-to-r from-red-600 to-red-400"
+              }`}
             >
               Red
             </button>
             <button
               onClick={() => changeLightColor("2")}
-              className='w-full py-3 text-white font-semibold rounded-lg bg-gradient-to-r from-blue-600 to-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400 transition duration-300'
+              className={`w-full py-3 text-white font-semibold rounded-lg transition-all duration-300 ${
+                lightColor === "2"
+                  ? "scale-110 bg-gradient-to-r from-blue-600 to-blue-400"
+                  : "bg-gradient-to-r from-blue-600 to-blue-400"
+              }`}
             >
               Blue
             </button>
             <button
               onClick={() => changeLightColor("3")}
-              className='w-full py-3 text-white font-semibold rounded-lg bg-gradient-to-r from-green-600 to-green-400 focus:outline-none focus:ring-2 focus:ring-green-400 transition duration-300'
+              className={`w-full py-3 text-white font-semibold rounded-lg transition-all duration-300 ${
+                lightColor === "3"
+                  ? "scale-110 bg-gradient-to-r from-green-600 to-green-400"
+                  : "bg-gradient-to-r from-green-600 to-green-400"
+              }`}
             >
               Green
             </button>
           </div>
+
+          {/* Brightness Slider (Only visible if light is ON) */}
+          {lightState && (
+            <div className='mt-4'>
+              <h3 className='text-xl font-semibold text-gray-700 mb-2'>
+                Set Brightness (1-255)
+              </h3>
+              <input
+                type='range'
+                min='1'
+                max='255'
+                value={brightness}
+                onChange={handleBrightnessChange}
+                className='w-full'
+              />
+              <p className='text-center text-gray-600'>{brightness}</p>
+            </div>
+          )}
         </div>
 
         {/* Motor Speed Control */}
@@ -141,7 +155,7 @@ function App() {
             Adjust Motor Speed
           </h2>
           <div className='flex items-center justify-center gap-4'>
-            {/* Speed 0 (Off) */}
+            {/* Motor Speed Buttons */}
             <button
               onClick={() => changeMotorSpeed(0)}
               className={`w-20 h-20 flex justify-center items-center bg-gradient-to-r from-gray-500 to-gray-400 text-white rounded-full font-semibold text-xl focus:outline-none focus:ring-2 focus:ring-gray-400 transition duration-300 ${
@@ -150,7 +164,6 @@ function App() {
             >
               Off
             </button>
-            {/* Speed 1 */}
             <button
               onClick={() => changeMotorSpeed(1)}
               className={`w-20 h-20 flex justify-center items-center bg-gradient-to-r from-red-600 to-red-400 text-white rounded-full font-semibold text-xl focus:outline-none focus:ring-2 focus:ring-red-400 transition duration-300 ${
@@ -159,7 +172,6 @@ function App() {
             >
               1
             </button>
-            {/* Speed 2 */}
             <button
               onClick={() => changeMotorSpeed(2)}
               className={`w-20 h-20 flex justify-center items-center bg-gradient-to-r from-blue-600 to-blue-400 text-white rounded-full font-semibold text-xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition duration-300 ${
@@ -168,7 +180,6 @@ function App() {
             >
               2
             </button>
-            {/* Speed 3 */}
             <button
               onClick={() => changeMotorSpeed(3)}
               className={`w-20 h-20 flex justify-center items-center bg-gradient-to-r from-green-600 to-green-400 text-white rounded-full font-semibold text-xl focus:outline-none focus:ring-2 focus:ring-green-400 transition duration-300 ${
@@ -178,20 +189,6 @@ function App() {
               3
             </button>
           </div>
-        </div>
-
-        {/* Status Display */}
-        <div className='mb-6'>
-          <h2 className='text-2xl font-semibold text-gray-700 mb-3'>
-            Current Status
-          </h2>
-          <p className='text-lg text-gray-800'>{status}</p>
-          <button
-            onClick={getStatus}
-            className='mt-4 w-full py-3 text-white font-semibold bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-300'
-          >
-            Get Status
-          </button>
         </div>
       </div>
     </div>
