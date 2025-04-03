@@ -4,7 +4,7 @@ import mqtt from "mqtt";
 function App() {
   // States to manage the light and motor settings, and MQTT client connection
   const [lightState, setLightState] = useState(false); // Light on/off
-  const [lightColor, setLightColor] = useState("None"); // Light color (Red, Green, Blue)
+  const [lightColor, setLightColor] = useState(0); // Light color (Red by default)
   const [motorSpeed, setMotorSpeed] = useState(0); // Motor speed (0: off, 1: low, 2: medium, 3: high)
   const [brightness, setBrightness] = useState(255); // Light brightness (1 to 255)
   const [client, setClient] = useState(null); // MQTT client to communicate with broker
@@ -41,9 +41,12 @@ function App() {
   const toggleLight = () => {
     const newLightState = !lightState; // Toggle the light state
     setLightState(newLightState);
+    if (newLightState) {
+      setLightColor(1); // Set color to red when turning the light on
+    }
 
     // Publish the new light state to the MQTT broker
-    const message = newLightState ? "1" : "0"; // "1" for ON, "0" for OFF
+    const message = newLightState ? 1 : 0; // 1 for ON, 0 for OFF
     if (client) {
       client.publish("/light", message); // Send the light state to the broker
     }
@@ -54,7 +57,7 @@ function App() {
     setLightColor(color);
 
     // Publish the selected color to the MQTT broker
-    if (client) {
+    if (client && lightstate) {
       client.publish("/light", color); // Send the selected color to the broker
     }
   };
@@ -96,8 +99,20 @@ function App() {
             Control Light
           </h2>
 
+          {/* Toggle Light Button */}
+          <button
+            onClick={toggleLight}
+            className={`w-full py-3 text-white font-semibold rounded-lg transition-all duration-300 ${
+              lightState
+                ? "bg-gradient-to-r from-green-600 to-green-400"
+                : "bg-gradient-to-r from-gray-500 to-gray-400"
+            }`}
+          >
+            {lightState ? "Turn Off Light" : "Turn On Light"}
+          </button>
+
           {/* Buttons to toggle light color */}
-          <div className='grid grid-cols-3 gap-4'>
+          <div className='grid grid-cols-3 gap-4 mt-4'>
             <button
               onClick={() => changeLightColor("1")}
               className={`w-full py-3 text-white font-semibold rounded-lg transition-all duration-300 ${
@@ -111,7 +126,7 @@ function App() {
             <button
               onClick={() => changeLightColor("2")}
               className={`w-full py-3 text-white font-semibold rounded-lg transition-all duration-300 ${
-                lightColor === "2"
+                lightColor === 2
                   ? "scale-110 bg-gradient-to-r from-blue-600 to-blue-400"
                   : "bg-gradient-to-r from-blue-600 to-blue-400"
               }`}
@@ -121,7 +136,7 @@ function App() {
             <button
               onClick={() => changeLightColor("3")}
               className={`w-full py-3 text-white font-semibold rounded-lg transition-all duration-300 ${
-                lightColor === "3"
+                lightColor === 3
                   ? "scale-110 bg-gradient-to-r from-green-600 to-green-400"
                   : "bg-gradient-to-r from-green-600 to-green-400"
               }`}
