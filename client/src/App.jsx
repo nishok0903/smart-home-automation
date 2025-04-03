@@ -72,9 +72,9 @@ function App() {
     const convertedIntensity = Math.round((intensity / 100) * (255 - 1) + 1);
     setLightIntensity(intensity);
     if (client && lightState) {
-      client.publish("/light/intensity", convertedIntensity.toString());
+      client.publish("/intensity", convertedIntensity.toString());
     }
-  };
+  }
   
 
   const toggleTheme = () => {
