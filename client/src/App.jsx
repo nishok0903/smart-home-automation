@@ -27,7 +27,16 @@ function App() {
 
     mqttClient.on("message", (topic, message) => {
       if (topic === "/getstatus") {
-        setStatus(message.toString());
+        const statusMessage = message.toString();
+        const statusParts = statusMessage.split(",");
+        const lightStatus = statusParts[0].split(":")[1]; // light:1 or light:0
+        const motorStatus = statusParts[1].split(":")[1]; // motor:1, motor:2, motor:3, or motor:0
+
+        const formattedStatus = `
+          Light is ${lightStatus === "1" ? "ON" : "OFF"} 
+          | Motor Speed is ${motorStatus === "0" ? "OFF" : motorStatus}
+        `;
+        setStatus(formattedStatus);
       }
     });
 
