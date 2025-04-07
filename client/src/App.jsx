@@ -1,7 +1,7 @@
-"use client"
+import { useState, useEffect, } from "react"
+import React from 'react';
 
-import { useState, useEffect } from "react"
-import { ReactComponent as FanIcon } from './assets/mingcute_fan-fill.svg';
+
 import mqtt from "mqtt"
 
 function App() {
@@ -13,6 +13,7 @@ function App() {
   const [client, setClient] = useState(null)
   const [isConnecting, setIsConnecting] = useState(true)
   const [darkTheme, setDarkTheme] = useState(true)
+  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
   useEffect(() => {
     // MQTT Broker configuration using environment variables
@@ -26,14 +27,35 @@ function App() {
       mqttClient.subscribe("/light")
       mqttClient.subscribe("/motor")
       mqttClient.subscribe("/getstatus")
+      mqttClient.subscribe("/status");
       setIsConnecting(false)
     })
 
+    mqttClient.publish("/getstatus","h");
+    
     mqttClient.on("message", (topic, message) => {
-      if (topic === "/getstatus") {
-        setStatus(message.toString())
+      if (topic === "/status") {
+        console.log("HERE");
+        const [led, motor, intensity] = message.toString().split(" ");
+        console.log(led, motor, intensity);
+        
+        if(led=="0")
+        {
+          setLightColor("None");setLightState(false);
+        }
+        else
+        {
+          setLightColor(led);
+          setLightState(true);
+        }
+
+        setMotorSpeed(Number(motor));
+        setLightIntensity(Math.round(Number(intensity) / 255 * 100));   
+          
+       
       }
-    })
+    });
+    
 
     // Store the client so it can be used elsewhere
     setClient(mqttClient)
@@ -44,35 +66,44 @@ function App() {
     }
   }, [])
 
-  const toggleLight = () => {
+  const toggleLight = async() => {
     const newState = !lightState
     setLightState(newState)
     const message = newState ? "1" : "0"
     if (client) {
       client.publish("/light", message)
+      //Here I want little delay before the next publish works
+      await delay(250); // 500ms delay
+      client.publish("/getstatus","h");
     }
   }
 
-  const changeLightColor = (color) => {
+  const changeLightColor = async(color) => {
     setLightColor(color)
     if (client) {
       client.publish("/light", color)
+      await delay(250); // 500ms delay
+      client.publish("/getstatus","h");
     }
   }
 
-  const changeMotorSpeed = (speed) => {
+  const changeMotorSpeed = async(speed) => {
     setMotorSpeed(speed)
     const message = speed.toString()
     if (client) {
       client.publish("/motor", message)
+      await delay(250); // 500ms delay
+      client.publish("/getstatus","h");
     }
   }
 
-  const changeLightIntensity = (intensity) => {
+  const changeLightIntensity = async(intensity) => {
     const convertedIntensity = Math.round((intensity / 100) * (255 - 1) + 1);
     setLightIntensity(intensity);
     if (client && lightState) {
       client.publish("/intensity", convertedIntensity.toString());
+      await delay(250); // 500ms delay
+      client.publish("/getstatus","h");
     }
   }
   
@@ -462,10 +493,7 @@ function App() {
 
             <div className="flex items-center justify-between mb-6 relative z-10">
               <div className="flex items-center space-x-3">
-                <FanIcon
-                  className={`h-6 w-6 text-blue-400 ${motorSpeed > 0 ? "animate-spin" : ""}`}
-                  style={{ animationDuration: motorSpeed > 0 ? `${4 - motorSpeed}s` : "0s" }}
-                />
+                
                 <h2 className={`text-2xl font-semibold ${darkTheme ? "text-gray-100" : "text-gray-800"}`}>
                   Living Room Fan
                 </h2>
